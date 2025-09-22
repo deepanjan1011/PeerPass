@@ -338,35 +338,34 @@ public class FileController {
                 try (Socket finalSocket = socket;
                      InputStream socketInput = new java.io.BufferedInputStream(finalSocket.getInputStream())) {
                     String filename = "downloaded-file"; // Default filename
+                    long contentLength = -1L;
 
-                    ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
+                    // Read headers line by line
+                    StringBuilder headerBuilder = new StringBuilder();
                     int b;
                     while ((b = socketInput.read()) != -1) {
-                        if (b == '\n') break;
-                        headerBaos.write(b);
+                        if (b == '\n') {
+                            String line = headerBuilder.toString().trim();
+                            if (line.isEmpty()) {
+                                break; // End of headers
+                            }
+                            
+                            if (line.startsWith("Filename: ")) {
+                                filename = line.substring("Filename: ".length());
+                            } else if (line.startsWith("Length: ")) {
+                                try {
+                                    contentLength = Long.parseLong(line.substring("Length: ".length()).trim());
+                                } catch (NumberFormatException e) {
+                                    System.err.println("Failed to parse length: " + line);
+                                }
+                            }
+                            headerBuilder.setLength(0);
+                        } else {
+                            headerBuilder.append((char) b);
+                        }
                     }
-
-                    String firstHeader = headerBaos.toString().trim();
-                    if (firstHeader.startsWith("Filename: ")) {
-                        filename = firstHeader.substring("Filename: ".length());
-                    }
-
-                    // Try to parse an optional Length header (second line)
-                    socketInput.mark(8192);
-                    ByteArrayOutputStream header2 = new ByteArrayOutputStream();
-                    while ((b = socketInput.read()) != -1) {
-                        if (b == '\n') break;
-                        header2.write(b);
-                    }
-                    String secondHeader = header2.toString().trim();
-                    long contentLength = -1L;
-                    if (secondHeader.startsWith("Length: ")) {
-                        try {
-                            contentLength = Long.parseLong(secondHeader.substring("Length: ".length()).trim());
-                        } catch (NumberFormatException ignore) {}
-                    } else {
-                        try { socketInput.reset(); } catch (IOException ignore) {}
-                    }
+                    
+                    System.out.println("Download headers - Filename: " + filename + ", Length: " + contentLength);
 
                     headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
                     String mime = null;

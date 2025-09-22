@@ -74,8 +74,11 @@ public class FileSharer {
                 String filename = f.getName();
                 long length = f.length();
                 String header = "Filename: " + filename + "\n" +
-                                "Length: " + length + "\n";
+                                "Length: " + length + "\n" +
+                                "\n"; // Empty line to end headers
                 oss.write(header.getBytes());
+                oss.flush(); // Ensure headers are sent immediately
+                System.out.println("Sent headers: " + header.trim());
 
                 // Send the file content from start
                 byte[] buffer = new byte[1024 * 1024];
