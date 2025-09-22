@@ -144,6 +144,8 @@ fi
 
 # Start backend with PM2
 echo "Starting backend with PM2..."
+# Build the project first
+mvn clean package -DskipTests
 # Ensure all dependencies are in the classpath
 CLASSPATH="target/p2p-1.0-SNAPSHOT.jar:$(mvn dependency:build-classpath -DincludeScope=runtime -Dmdep.outputFile=/dev/stdout -q)"
 pm2 start --name peerpass-backend java -- -cp "$CLASSPATH" p2p.App
