@@ -12,7 +12,9 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [port, setPort] = useState<number | null>(null);
+  const [fileId, setFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
+  const [downloadPassword, setDownloadPassword] = useState('');
   
   // Progress tracking states
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -29,7 +31,7 @@ export default function Home() {
   const lastUploadBytes = useRef<number>(0);
   const lastDownloadBytes = useRef<number>(0);
 
-  const handleFileUpload = async (file: File) => {
+  const handleFileUpload = async (file: File, password?: string) => {
     setUploadedFile(file);
     setIsUploading(true);
     setUploadProgress(0);
@@ -41,6 +43,9 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (password) {
+        formData.append('password', password);
+      }
       
       const response = await axios.post('/api/upload', formData, {
         headers: {
@@ -68,6 +73,14 @@ export default function Home() {
       });
       
       setPort(response.data.port);
+      setFileId(response.data.fileId);
+      
+      // Show success message with file ID
+      if (response.data.hasPassword) {
+        alert(`File uploaded successfully! File ID: ${response.data.fileId}\n\nThis file is password protected. Share the code and password with recipients.`);
+      } else {
+        alert(`File uploaded successfully! File ID: ${response.data.fileId}\n\nShare this code with recipients to download the file.`);
+      }
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file. Please try again.');
@@ -76,7 +89,7 @@ export default function Home() {
     }
   };
   
-  const handleDownload = async (port: number) => {
+  const handleDownload = async (port: number, password?: string) => {
     setIsDownloading(true);
     setDownloadProgress(0);
     setDownloadSpeed(0);
@@ -86,7 +99,11 @@ export default function Home() {
 
     try {
       // Simple download - get the full file at once
-      const response = await axios.get(`/api/download/${port}`, {
+      const url = password 
+        ? `/api/download/${port}?password=${encodeURIComponent(password)}`
+        : `/api/download/${port}`;
+        
+      const response = await axios.get(url, {
         responseType: 'arraybuffer',
         onDownloadProgress: (progressEvent) => {
           if (progressEvent.total) {

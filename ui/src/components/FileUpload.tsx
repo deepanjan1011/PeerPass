@@ -4,18 +4,20 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 
 interface FileUploadProps {
-  onFileUpload: (file: File) => void;
+  onFileUpload: (file: File, password?: string) => void;
   isUploading: boolean;
 }
 
 export default function FileUpload({ onFileUpload, isUploading }: FileUploadProps) {
   const [dragActive, setDragActive] = useState(false);
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      onFileUpload(acceptedFiles[0]);
+      onFileUpload(acceptedFiles[0], password.trim() || undefined);
     }
-  }, [onFileUpload]);
+  }, [onFileUpload, password]);
   
   const { getRootProps, getInputProps } = useDropzone({ 
     onDrop,
@@ -82,6 +84,34 @@ export default function FileUpload({ onFileUpload, isUploading }: FileUploadProp
             <div className="h-full w-full rounded-xl border-2 border-primary animate-pulse" />
           </div>
         )}
+      </div>
+      
+      {/* Password input */}
+      <div className="mt-6 space-y-2">
+        <label className="text-sm font-medium text-foreground">
+          Password Protection (Optional)
+        </label>
+        <div className="relative">
+          <input
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter password to protect this file"
+            className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
+            disabled={isUploading}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            disabled={isUploading}
+          >
+            {showPassword ? '👁️' : '👁️‍🗨️'}
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Recipients will need this password to download the file
+        </p>
       </div>
     </div>
   );

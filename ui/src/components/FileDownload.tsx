@@ -3,12 +3,13 @@
 import { useState } from 'react';
 
 interface FileDownloadProps {
-  onDownload: (port: number) => Promise<void>;
+  onDownload: (port: number, password?: string) => Promise<void>;
   isDownloading: boolean;
 }
 
 export default function FileDownload({ onDownload, isDownloading }: FileDownloadProps) {
   const [inviteCode, setInviteCode] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   
@@ -23,10 +24,11 @@ export default function FileDownload({ onDownload, isDownloading }: FileDownload
     }
     
     try {
-      await onDownload(port);
+      await onDownload(port, password.trim() || undefined);
       setInviteCode(''); // Clear on success
+      setPassword(''); // Clear password on success
     } catch (err) {
-      setError('Failed to connect. Please verify the invite code.');
+      setError('Failed to connect. Please verify the invite code and password.');
     }
   };
   
@@ -135,6 +137,31 @@ export default function FileDownload({ onDownload, isDownloading }: FileDownload
               <p className="text-sm">{error}</p>
             </div>
           )}
+        </div>
+        
+        {/* Password input */}
+        <div className="space-y-2">
+          <label 
+            htmlFor="password" 
+            className="block text-sm font-medium text-foreground"
+          >
+            Password (if required)
+          </label>
+          <input
+            type="password"
+            id="password"
+            value={password}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError(''); // Clear error on input change
+            }}
+            placeholder="Enter password if file is protected"
+            className="input-field"
+            disabled={isDownloading}
+          />
+          <p className="text-xs text-muted-foreground">
+            Only required if the sender set a password for this file
+          </p>
         </div>
         
         <button

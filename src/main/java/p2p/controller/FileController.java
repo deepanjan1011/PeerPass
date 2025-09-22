@@ -23,15 +23,19 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import p2p.service.FileSharer;
+import p2p.service.FileShareManager;
+import p2p.model.FileShare;
 
 public class FileController {
     private final FileSharer fileSharer;
+    private final FileShareManager fileShareManager;
     private final HttpServer server;
     private final String uploadDir;
     private final ExecutorService executorService;
 
     public FileController(int port) throws IOException {
         this.fileSharer = new FileSharer();
+        this.fileShareManager = FileShareManager.getInstance();
         this.server = HttpServer.create(new InetSocketAddress(port), 0);
         this.uploadDir = System.getProperty("java.io.tmpdir") + File.separator + "peerlink-uploads";
         this.executorService = Executors.newFixedThreadPool(10);
@@ -242,12 +246,26 @@ public class FileController {
                 FileItemIterator iter = upload.getItemIterator(ctx);
 
                 String savedFilePath = null;
+                String password = null;
+                String filename = null;
+                
                 while (iter.hasNext()) {
                     FileItemStream item = iter.next();
                     if (item.isFormField()) {
+                        // Handle form fields (like password)
+                        if ("password".equals(item.getFieldName())) {
+                            try (InputStream fieldStream = item.openStream()) {
+                                byte[] buffer = new byte[1024];
+                                int bytesRead = fieldStream.read(buffer);
+                                if (bytesRead > 0) {
+                                    password = new String(buffer, 0, bytesRead).trim();
+                                }
+                            }
+                        }
                         continue;
                     }
-                    String filename = item.getName();
+                    
+                    filename = item.getName();
                     if (filename == null || filename.trim().isEmpty()) {
                         filename = "unnamed-file";
                     }
@@ -274,10 +292,15 @@ public class FileController {
                     return;
                 }
 
-                int port = fileSharer.offerFile(savedFilePath);
+                // Create file share with password protection
+                File file = new File(savedFilePath);
+                String fileId = fileShareManager.createFileShare(savedFilePath, filename, file.length(), password);
+                
+                // Generate port for this file share
+                int port = fileShareManager.offerFile(fileId);
                 new Thread(() -> fileSharer.startFileServer(port)).start();
 
-                String jsonResponse = "{\"port\": " + port + "}";
+                String jsonResponse = "{\"fileId\": \"" + fileId + "\", \"port\": " + port + ", \"hasPassword\": " + (password != null && !password.isEmpty()) + "}";
                 headers.add("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
                 try (OutputStream os = exchange.getResponseBody()) {
@@ -311,11 +334,57 @@ public class FileController {
             }
             
             String path = exchange.getRequestURI().getPath();
+            String query = exchange.getRequestURI().getQuery();
             String portStr = path.substring(path.lastIndexOf('/') + 1);
-            // No Range support (resume) – simplified flow
+            
+            // Extract password from query parameters
+            String password = null;
+            if (query != null && query.contains("password=")) {
+                String[] params = query.split("&");
+                for (String param : params) {
+                    if (param.startsWith("password=")) {
+                        password = param.substring("password=".length());
+                        break;
+                    }
+                }
+            }
             
             try {
                 int port = Integer.parseInt(portStr);
+                
+                // Get file share and verify password
+                FileShare fileShare = fileShareManager.getFileShareByPort(port);
+                if (fileShare == null) {
+                    String response = "File not found or expired";
+                    exchange.sendResponseHeaders(404, response.getBytes().length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response.getBytes());
+                    }
+                    return;
+                }
+                
+                // Check if file can still be downloaded
+                if (!fileShare.canDownload()) {
+                    String response = "Maximum download limit reached";
+                    exchange.sendResponseHeaders(403, response.getBytes().length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response.getBytes());
+                    }
+                    return;
+                }
+                
+                // Verify password if required
+                if (!fileShare.verifyPassword(password)) {
+                    String response = "Invalid password";
+                    exchange.sendResponseHeaders(401, response.getBytes().length);
+                    try (OutputStream os = exchange.getResponseBody()) {
+                        os.write(response.getBytes());
+                    }
+                    return;
+                }
+                
+                // Record download
+                fileShareManager.recordDownload(fileShare.getFileId());
 
                 // Wait for the ephemeral peer port to be ready (avoid race with server startup)
                 Socket socket = null;
