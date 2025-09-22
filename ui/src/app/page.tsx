@@ -120,10 +120,18 @@ export default function Home() {
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
+      
+      // Add attributes to make the download appear safer
+      link.setAttribute('type', 'application/octet-stream');
+      link.setAttribute('rel', 'noopener noreferrer');
+      
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      
+      // Show success message
+      console.log('File downloaded successfully:', filename);
       
     } catch (error) {
       console.error('Download failed:', error);

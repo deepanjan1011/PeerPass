@@ -376,6 +376,16 @@ public class FileController {
                     }
                     headers.add("Content-Type", mime);
                     headers.add("Access-Control-Expose-Headers", "Content-Disposition");
+                    
+                    // Add security headers to make downloads appear safer
+                    headers.add("X-Content-Type-Options", "nosniff");
+                    headers.add("X-Download-Options", "noopen");
+                    headers.add("Content-Security-Policy", "default-src 'none'");
+                    
+                    // Add cache headers to indicate this is a legitimate download
+                    headers.add("Cache-Control", "private, no-cache, no-store, must-revalidate");
+                    headers.add("Pragma", "no-cache");
+                    headers.add("Expires", "0");
 
                     // Use known length when available; else chunked
                     if (contentLength >= 0) {
