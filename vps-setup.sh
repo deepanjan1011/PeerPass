@@ -35,6 +35,12 @@ echo "Installing Maven..."
 sudo apt install -y maven
 
 
+#clone respository
+#echo "Cloning repository..."
+git clone https://github.com/deepanjan1011/PeerPass.git
+cd PeerPass
+
+
 # Build backend
 echo "Building Java backend..."
 mvn clean package
@@ -55,7 +61,7 @@ if [ -e /etc/nginx/sites-enabled/default ]; then
     echo "Removed default Nginx site configuration."
 fi
 
-# Create the peerlink configuration file with the correct content
+# Create the peerpass configuration file with the correct content
 echo "Creating /etc/nginx/sites-available/peerpass..."
 cat <<EOF | sudo tee /etc/nginx/sites-available/peerpass
 server {
