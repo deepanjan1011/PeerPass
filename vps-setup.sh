@@ -70,6 +70,9 @@ server {
 
     # Allow very large uploads (tune as needed)
     client_max_body_size 5g;
+    client_body_timeout 3600s;
+    send_timeout 3600s;
+    keepalive_timeout 3600s;
 
     # Backend API
     location /api/ {
@@ -86,6 +89,7 @@ server {
         # Stream uploads/downloads (do not buffer at Nginx)
         proxy_request_buffering off;
         proxy_buffering off;
+        proxy_max_temp_file_size 0;
 
         # Long timeouts for big transfers
         proxy_read_timeout 3600s;
