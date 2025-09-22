@@ -318,7 +318,7 @@ public class FileController {
                 int port = Integer.parseInt(portStr);
                 
                 try (Socket socket = new Socket("localhost", port);
-                     InputStream socketInput = socket.getInputStream()) {
+                     InputStream socketInput = new java.io.BufferedInputStream(socket.getInputStream())) {
                     String filename = "downloaded-file"; // Default filename
 
                     ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
@@ -334,7 +334,7 @@ public class FileController {
                     }
 
                     // Try to parse an optional Length header (second line)
-                    socketInput.mark(1024);
+                    socketInput.mark(8192);
                     ByteArrayOutputStream header2 = new ByteArrayOutputStream();
                     while ((b = socketInput.read()) != -1) {
                         if (b == '\n') break;
