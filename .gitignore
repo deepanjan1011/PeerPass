@@ -1,0 +1,25 @@
+# General
+.DS_Store
+.env
+.env.*
+*.log
+.idea/
+.vscode/
+# Java/Maven
+target/
+.mvn/
+# Node/Next.js (ui)
+ui/node_modules/
+ui/.next/
+ui/.turbo/
+ui/.vercel/
+ui/out/
+ui/dist/
+ui/npm-debug.log*
+ui/yarn-error.log*
+ui/pnpm-lock.yaml
+# Docker
+**/.dockerignore
+Dockerfile*
+# OS
+Thumbs.db
