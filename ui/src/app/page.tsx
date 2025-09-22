@@ -83,89 +83,39 @@ export default function Home() {
     setDownloadEta(0);
     setDownloadedBytes(0);
     downloadStartTime.current = Date.now();
-    lastDownloadBytes.current = 0;
-
-    const headersLower = (h: any) => {
-      const out: Record<string, string> = {};
-      for (const k in h) out[k.toLowerCase()] = (h as any)[k];
-      return out;
-    };
-
-    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
-    const MAX_RETRIES = 5;
 
     try {
-      // Probe total size and filename with a tiny ranged request
-      const probe = await axios.get(`/api/download/${port}`, {
+      // Simple download - get the full file at once
+      const response = await axios.get(`/api/download/${port}`, {
         responseType: 'arraybuffer',
-        headers: { Range: 'bytes=0-0' },
-        validateStatus: () => true,
-      });
-      const ph = headersLower(probe.headers);
-      const cr = ph['content-range'];
-      let total = 0;
-      if (cr) {
-        const m = /bytes\s+(\d+)-(\d+)\/(\d+)/i.exec(cr);
-        if (m) total = parseInt(m[3], 10);
-      } else {
-        const cl = ph['content-length'];
-        total = cl ? parseInt(cl, 10) : 0;
-      }
-      if (!total || isNaN(total) || total <= 0) {
-        throw new Error('Unable to determine file size');
-      }
-
-      // Derive filename
-      let filename = 'downloaded-file';
-      const cd = ph['content-disposition'];
-      if (cd) {
-        const m = /filename="(.+)"/i.exec(cd);
-        if (m && m[1]) filename = m[1];
-      }
-
-      const parts: BlobPart[] = [];
-      let downloaded = 0;
-      let start = 0;
-      let lastTick = Date.now();
-
-      while (start < total) {
-        const end = Math.min(start + CHUNK_SIZE - 1, total - 1);
-        let attempt = 0;
-        for (;;) {
-          try {
-            const res = await axios.get(`/api/download/${port}`, {
-              responseType: 'arraybuffer',
-              headers: { Range: `bytes=${start}-${end}` },
-              validateStatus: () => true,
-            });
-            if (res.status !== 206 && !(start === 0 && res.status === 200)) {
-              throw new Error(`Unexpected status ${res.status}`);
-            }
-            const chunk = res.data as ArrayBuffer;
-            parts.push(new Blob([chunk]));
-            const received = end - start + 1;
-            downloaded += received;
-            start = end + 1;
-
-            // Progress/speed/eta
-            const now = Date.now();
-            const elapsed = (now - downloadStartTime.current) / 1000;
-            const bps = downloaded / Math.max(1, elapsed);
+        onDownloadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const downloaded = progressEvent.loaded;
+            const total = progressEvent.total;
+            const progress = (downloaded / total) * 100;
+            const elapsed = (Date.now() - downloadStartTime.current) / 1000;
+            const speed = downloaded / elapsed;
+            
             setDownloadedBytes(downloaded);
-            setDownloadProgress((downloaded / total) * 100);
-            setDownloadSpeed(bps / (1024 * 1024));
-            if (bps > 0) setDownloadEta((total - downloaded) / bps);
-            lastTick = now;
-            break;
-          } catch (err) {
-            attempt += 1;
-            if (attempt > MAX_RETRIES) throw err;
-            await new Promise((r) => setTimeout(r, 500 * attempt));
+            setDownloadProgress(progress);
+            setDownloadSpeed(speed / (1024 * 1024)); // MB/s
+            setDownloadEta((total - downloaded) / speed);
           }
+        }
+      });
+
+      // Get filename from Content-Disposition header
+      let filename = 'downloaded-file';
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const match = /filename="(.+)"/i.exec(contentDisposition);
+        if (match && match[1]) {
+          filename = match[1];
         }
       }
 
-      const blob = new Blob(parts);
+      // Create and download the file
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -173,9 +123,11 @@ export default function Home() {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(url);
+      
     } catch (error) {
-      console.error('Error downloading file:', error);
-      alert('Failed to download file. Please check the invite code and try again.');
+      console.error('Download failed:', error);
+      alert('Download failed: ' + (error as Error).message);
     } finally {
       setIsDownloading(false);
     }
