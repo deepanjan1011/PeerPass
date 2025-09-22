@@ -7,4 +7,5 @@ p2p/controller/FileController$CORSHandler.class
 p2p/service/FileSharer$FileSenderHandler.class
 p2p/utils/UploadUtils.class
 p2p/controller/FileController$MultipartParser$ParseResult.class
+p2p/controller/FileController$HttpExchangeRequestContext.class
 p2p/App.class
