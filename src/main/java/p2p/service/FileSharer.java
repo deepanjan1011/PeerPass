@@ -1,11 +1,14 @@
 package p2p.service;
 
-import p2p.utils.UploadUtils;
-
-import java.io.*;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
+
+import p2p.utils.UploadUtils;
 
 public class FileSharer {
 
@@ -19,9 +22,16 @@ public class FileSharer {
         int port;
         while (true) {
             port = UploadUtils.generateCode();
-            if (!availableFiles.containsKey(port)) {
+            if (availableFiles.containsKey(port)) {
+                continue;
+            }
+            // Try binding to ensure the port is actually free and reachable
+            try (ServerSocket ss = new ServerSocket(port)) {
+                ss.setReuseAddress(true);
                 availableFiles.put(port, filePath);
                 return port;
+            } catch (IOException bindErr) {
+                // port in use; try another
             }
         }
     }
