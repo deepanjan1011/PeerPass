@@ -334,7 +334,15 @@ public class FileController {
                     }
 
                     headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-                    headers.add("Content-Type", "application/octet-stream");
+                    String mime = null;
+                    try {
+                        mime = java.net.URLConnection.guessContentTypeFromName(filename);
+                    } catch (Exception ignore) {}
+                    if (mime == null || mime.trim().isEmpty()) {
+                        mime = "application/octet-stream";
+                    }
+                    headers.add("Content-Type", mime);
+                    headers.add("Access-Control-Expose-Headers", "Content-Disposition");
 
                     // Stream directly to client with chunked transfer
                     exchange.sendResponseHeaders(200, -1);
