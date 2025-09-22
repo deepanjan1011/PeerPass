@@ -84,55 +84,91 @@ export default function Home() {
     setDownloadedBytes(0);
     downloadStartTime.current = Date.now();
     lastDownloadBytes.current = 0;
-    
+
+    const headersLower = (h: any) => {
+      const out: Record<string, string> = {};
+      for (const k in h) out[k.toLowerCase()] = (h as any)[k];
+      return out;
+    };
+
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_RETRIES = 5;
+
     try {
-      const response = await axios.get(`/api/download/${port}`, {
-        responseType: 'blob',
-        onDownloadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const progress = (progressEvent.loaded / progressEvent.total) * 100;
-            setDownloadProgress(progress);
-            setDownloadedBytes(progressEvent.loaded);
-            
-            // Calculate speed and ETA
-            const currentTime = Date.now();
-            const elapsedTime = (currentTime - downloadStartTime.current) / 1000; // seconds
-            const bytesPerSecond = progressEvent.loaded / elapsedTime;
-            const mbps = bytesPerSecond / (1024 * 1024);
-            setDownloadSpeed(mbps);
-            
-            if (mbps > 0) {
-              const remainingBytes = progressEvent.total - progressEvent.loaded;
-              const eta = remainingBytes / bytesPerSecond;
-              setDownloadEta(eta);
-            }
-          }
-        },
+      // Probe total size and filename with a tiny ranged request
+      const probe = await axios.get(`/api/download/${port}`, {
+        responseType: 'arraybuffer',
+        headers: { Range: 'bytes=0-0' },
+        validateStatus: () => true,
       });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const ph = headersLower(probe.headers);
+      const cr = ph['content-range'];
+      let total = 0;
+      if (cr) {
+        const m = /bytes\s+(\d+)-(\d+)\/(\d+)/i.exec(cr);
+        if (m) total = parseInt(m[3], 10);
+      } else {
+        const cl = ph['content-length'];
+        total = cl ? parseInt(cl, 10) : 0;
+      }
+      if (!total || isNaN(total) || total <= 0) {
+        throw new Error('Unable to determine file size');
+      }
+
+      // Derive filename
+      let filename = 'downloaded-file';
+      const cd = ph['content-disposition'];
+      if (cd) {
+        const m = /filename="(.+)"/i.exec(cd);
+        if (m && m[1]) filename = m[1];
+      }
+
+      const parts: BlobPart[] = [];
+      let downloaded = 0;
+      let start = 0;
+      let lastTick = Date.now();
+
+      while (start < total) {
+        const end = Math.min(start + CHUNK_SIZE - 1, total - 1);
+        let attempt = 0;
+        for (;;) {
+          try {
+            const res = await axios.get(`/api/download/${port}`, {
+              responseType: 'arraybuffer',
+              headers: { Range: `bytes=${start}-${end}` },
+              validateStatus: () => true,
+            });
+            if (res.status !== 206 && !(start === 0 && res.status === 200)) {
+              throw new Error(`Unexpected status ${res.status}`);
+            }
+            const chunk = res.data as ArrayBuffer;
+            parts.push(new Blob([chunk]));
+            const received = end - start + 1;
+            downloaded += received;
+            start = end + 1;
+
+            // Progress/speed/eta
+            const now = Date.now();
+            const elapsed = (now - downloadStartTime.current) / 1000;
+            const bps = downloaded / Math.max(1, elapsed);
+            setDownloadedBytes(downloaded);
+            setDownloadProgress((downloaded / total) * 100);
+            setDownloadSpeed(bps / (1024 * 1024));
+            if (bps > 0) setDownloadEta((total - downloaded) / bps);
+            lastTick = now;
+            break;
+          } catch (err) {
+            attempt += 1;
+            if (attempt > MAX_RETRIES) throw err;
+            await new Promise((r) => setTimeout(r, 500 * attempt));
+          }
+        }
+      }
+
+      const blob = new Blob(parts);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      
-      const headers = response.headers;
-      let contentDisposition = '';
-      
-      for (const key in headers) {
-        if (key.toLowerCase() === 'content-disposition') {
-          contentDisposition = headers[key];
-          break;
-        }
-      }
-      
-      let filename = 'downloaded-file';
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch && filenameMatch.length === 2) {
-          filename = filenameMatch[1];
-        }
-      }
-      
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
