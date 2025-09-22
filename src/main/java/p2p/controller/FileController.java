@@ -316,9 +316,26 @@ public class FileController {
             
             try {
                 int port = Integer.parseInt(portStr);
-                
-                try (Socket socket = new Socket("localhost", port);
-                     InputStream socketInput = new java.io.BufferedInputStream(socket.getInputStream())) {
+
+                // Wait for the ephemeral peer port to be ready (avoid race with server startup)
+                Socket socket = null;
+                IOException lastErr = null;
+                for (int i = 0; i < 50; i++) { // up to ~10s (50 * 200ms)
+                    try {
+                        socket = new Socket("localhost", port);
+                        socket.setSoTimeout(60_000); // 60s socket read timeout
+                        break;
+                    } catch (IOException ce) {
+                        lastErr = ce;
+                        try { Thread.sleep(200); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                    }
+                }
+                if (socket == null) {
+                    throw new IOException("Could not connect to peer port " + port + (lastErr != null ? (": " + lastErr.getMessage()) : ""));
+                }
+
+                try (Socket finalSocket = socket;
+                     InputStream socketInput = new java.io.BufferedInputStream(finalSocket.getInputStream())) {
                     String filename = "downloaded-file"; // Default filename
 
                     ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
