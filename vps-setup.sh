@@ -68,6 +68,9 @@ server {
     listen 80;
     server_name _; # Catch-all for HTTP requests
 
+    # Allow very large uploads (tune as needed)
+    client_max_body_size 5g;
+
     # Backend API
     location /api/ {
         proxy_pass http://localhost:8080/;
@@ -79,6 +82,18 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
+
+        # Stream uploads/downloads (do not buffer at Nginx)
+        proxy_request_buffering off;
+        proxy_buffering off;
+
+        # Long timeouts for big transfers
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+
+        # Expose download filename to browsers
+        add_header Access-Control-Allow-Origin "*" always;
+        add_header Access-Control-Expose-Headers "Content-Disposition" always;
     }
 
     # Frontend
@@ -92,6 +107,11 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_cache_bypass \$http_upgrade;
+
+        # Frontend should also not buffer long streaming responses
+        proxy_buffering off;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
     }
 
     # Additional security headers (still good to have)
