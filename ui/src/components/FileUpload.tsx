@@ -72,7 +72,7 @@ export default function FileUpload({ onFileUpload, isUploading }: FileUploadProp
             Drop your file here, or <span className="text-primary">browse</span>
           </p>
           <p className="text-sm text-muted-foreground">
-            Supports any file type • Max 5GB
+            Supports any file type • Max 2GB
           </p>
         </div>
         
