@@ -3,7 +3,6 @@ package p2p.service;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -68,31 +67,9 @@ public class FileSharer {
         @Override
         public void run() {
             try (FileInputStream fis = new FileInputStream(filePath);
-                 OutputStream oss = clientSocket.getOutputStream();
-                 InputStream iss = clientSocket.getInputStream()) {
+                 OutputStream oss = clientSocket.getOutputStream()) {
 
-                // Optional: allow client to send an offset request first
-                clientSocket.setSoTimeout(1000); // small timeout to read optional line
-                long offset = 0L;
-                try {
-                    StringBuilder line = new StringBuilder();
-                    int ch;
-                    while ((ch = iss.read()) != -1) {
-                        if (ch == '\n') break;
-                        line.append((char) ch);
-                        if (line.length() > 64) break; // sanity limit
-                    }
-                    String maybe = line.toString().trim();
-                    if (maybe.startsWith("OFFSET: ")) {
-                        try { offset = Long.parseLong(maybe.substring(8).trim()); } catch (NumberFormatException ignore) {}
-                    }
-                } catch (Exception ignore) {
-                    // no offset line; proceed from 0
-                } finally {
-                    try { clientSocket.setSoTimeout(0); } catch (Exception ignore2) {}
-                }
-
-                // Send simple headers: Filename and Length (full length)
+                // Send simple headers: Filename (and total length for info)
                 File f = new File(filePath);
                 String filename = f.getName();
                 long length = f.length();
@@ -100,23 +77,13 @@ public class FileSharer {
                                 "Length: " + length + "\n";
                 oss.write(header.getBytes());
 
-                // Position the stream at offset
-                if (offset > 0) {
-                    long skipped = 0;
-                    while (skipped < offset) {
-                        long s = fis.skip(offset - skipped);
-                        if (s <= 0) break;
-                        skipped += s;
-                    }
-                }
-
-                // Send the file content from offset
+                // Send the file content from start
                 byte[] buffer = new byte[1024 * 1024];
                 int bytesRead;
                 while ((bytesRead = fis.read(buffer)) != -1) {
                     oss.write(buffer, 0, bytesRead);
                 }
-                System.out.println("File '" + filename + "' sent to " + clientSocket.getInetAddress() + (offset > 0 ? (" from offset " + offset) : ""));
+                System.out.println("File '" + filename + "' sent to " + clientSocket.getInetAddress());
             } catch (IOException e) {
                 System.err.println("Error sending file to client: " + e.getMessage());
             } finally {

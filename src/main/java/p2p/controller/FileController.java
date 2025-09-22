@@ -313,18 +313,7 @@ public class FileController {
             
             String path = exchange.getRequestURI().getPath();
             String portStr = path.substring(path.lastIndexOf('/') + 1);
-            // Parse HTTP Range for resume support (bytes=start-)
-            String rangeHeader = exchange.getRequestHeaders().getFirst("Range");
-            long rangeStart = 0L;
-            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
-                try {
-                    String startStr = rangeHeader.substring("bytes=".length());
-                    int dash = startStr.indexOf('-');
-                    if (dash >= 0) startStr = startStr.substring(0, dash);
-                    rangeStart = Long.parseLong(startStr.trim());
-                    if (rangeStart < 0) rangeStart = 0;
-                } catch (Exception ignore) {}
-            }
+            // No Range support (resume) – simplified flow
             
             try {
                 int port = Integer.parseInt(portStr);
@@ -347,14 +336,7 @@ public class FileController {
                 }
 
                 try (Socket finalSocket = socket;
-                     InputStream socketInput = new java.io.BufferedInputStream(finalSocket.getInputStream());
-                     OutputStream socketOutput = finalSocket.getOutputStream()) {
-                    // If client asked for a range, tell peer the offset first
-                    if (rangeStart > 0) {
-                        String offsetLine = "OFFSET: " + rangeStart + "\n";
-                        socketOutput.write(offsetLine.getBytes());
-                        socketOutput.flush();
-                    }
+                     InputStream socketInput = new java.io.BufferedInputStream(finalSocket.getInputStream())) {
                     String filename = "downloaded-file"; // Default filename
 
                     ByteArrayOutputStream headerBaos = new ByteArrayOutputStream();
@@ -399,17 +381,8 @@ public class FileController {
 
                     // Use known length when available; else chunked
                     if (contentLength >= 0) {
-                        if (rangeStart > 0 && rangeStart < contentLength) {
-                            long remaining = contentLength - rangeStart;
-                            headers.add("Accept-Ranges", "bytes");
-                            headers.add("Content-Range", "bytes " + rangeStart + "-" + (contentLength - 1) + "/" + contentLength);
-                            exchange.sendResponseHeaders(206, remaining);
-                        } else {
-                            headers.add("Accept-Ranges", "bytes");
-                            exchange.sendResponseHeaders(200, contentLength);
-                        }
+                        exchange.sendResponseHeaders(200, contentLength);
                     } else {
-                        headers.add("Accept-Ranges", "bytes");
                         exchange.sendResponseHeaders(200, -1);
                     }
                     try (OutputStream os = exchange.getResponseBody()) {
