@@ -328,9 +328,26 @@ public class FileController {
                         headerBaos.write(b);
                     }
 
-                    String header = headerBaos.toString().trim();
-                    if (header.startsWith("Filename: ")) {
-                        filename = header.substring("Filename: ".length());
+                    String firstHeader = headerBaos.toString().trim();
+                    if (firstHeader.startsWith("Filename: ")) {
+                        filename = firstHeader.substring("Filename: ".length());
+                    }
+
+                    // Try to parse an optional Length header (second line)
+                    socketInput.mark(1024);
+                    ByteArrayOutputStream header2 = new ByteArrayOutputStream();
+                    while ((b = socketInput.read()) != -1) {
+                        if (b == '\n') break;
+                        header2.write(b);
+                    }
+                    String secondHeader = header2.toString().trim();
+                    long contentLength = -1L;
+                    if (secondHeader.startsWith("Length: ")) {
+                        try {
+                            contentLength = Long.parseLong(secondHeader.substring("Length: ".length()).trim());
+                        } catch (NumberFormatException ignore) {}
+                    } else {
+                        try { socketInput.reset(); } catch (IOException ignore) {}
                     }
 
                     headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
@@ -344,8 +361,12 @@ public class FileController {
                     headers.add("Content-Type", mime);
                     headers.add("Access-Control-Expose-Headers", "Content-Disposition");
 
-                    // Stream directly to client with chunked transfer
-                    exchange.sendResponseHeaders(200, -1);
+                    // Use known length when available; else chunked
+                    if (contentLength >= 0) {
+                        exchange.sendResponseHeaders(200, contentLength);
+                    } else {
+                        exchange.sendResponseHeaders(200, -1);
+                    }
                     try (OutputStream os = exchange.getResponseBody()) {
                         byte[] buffer = new byte[1024 * 1024];
                         int bytesRead;
