@@ -6,16 +6,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 import p2p.utils.UploadUtils;
 
 public class FileSharer {
 
-    private HashMap<Integer, String> availableFiles;
+    private final ConcurrentHashMap<Integer, String> availableFiles;
 
     public FileSharer() {
-        availableFiles = new HashMap<>();
+        availableFiles = new ConcurrentHashMap<>();
     }
 
     /**
@@ -27,19 +27,13 @@ public class FileSharer {
     }
 
     public int offerFile(String filePath) {
-        int port;
+        // Generate a share code that is unique within our map. This is not a real port
+        // used for networking; the HTTP server streams directly from disk by code.
         while (true) {
-            port = UploadUtils.generateCode();
-            if (availableFiles.containsKey(port)) {
-                continue;
-            }
-            // Try binding to ensure the port is actually free and reachable
-            try (ServerSocket ss = new ServerSocket(port)) {
-                ss.setReuseAddress(true);
-                availableFiles.put(port, filePath);
+            int port = UploadUtils.generateCode();
+            String previous = availableFiles.putIfAbsent(port, filePath);
+            if (previous == null) {
                 return port;
-            } catch (IOException bindErr) {
-                // port in use; try another
             }
         }
     }
