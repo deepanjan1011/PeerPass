@@ -277,9 +277,9 @@ public class FileController {
                     return;
                 }
 
-                // Generate port (share code) for this file share
-                // We no longer spawn an ephemeral socket server; downloads stream directly from disk
+                // Generate port for this file share
                 int port = fileSharer.offerFile(savedFilePath);
+                new Thread(() -> fileSharer.startFileServer(port)).start();
 
                 String jsonResponse = "{\"port\": " + port + "}";
                 headers.add("Content-Type", "application/json");

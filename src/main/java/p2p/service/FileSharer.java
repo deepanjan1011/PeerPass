@@ -6,16 +6,16 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
 
 import p2p.utils.UploadUtils;
 
 public class FileSharer {
 
-    private final ConcurrentHashMap<Integer, String> availableFiles;
+    private HashMap<Integer, String> availableFiles;
 
     public FileSharer() {
-        availableFiles = new ConcurrentHashMap<>();
+        availableFiles = new HashMap<>();
     }
 
     public int offerFile(String filePath) {
@@ -34,11 +34,6 @@ public class FileSharer {
                 // port in use; try another
             }
         }
-    }
-
-    /** Remove a share mapping explicitly (not used in multi-receiver flow). */
-    public void removeShare(int port) {
-        availableFiles.remove(port);
     }
 
     public void startFileServer(int port) {

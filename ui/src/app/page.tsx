@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import FileUpload from '@/components/FileUpload';
 import FileDownload from '@/components/FileDownload';
+import InviteCode from '@/components/InviteCode';
 import ProgressBar from '@/components/ProgressBar';
 import axios from 'axios';
 
@@ -74,7 +75,8 @@ export default function Home() {
       setUploadSpeed(0);
       setUploadEta(0);
       
-      // Success handled silently; no popup and no code display
+      // Show success message
+      alert(`File uploaded successfully!\n\nShare this code with recipients: ${response.data.port}`);
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file. Please try again.');
@@ -254,7 +256,7 @@ export default function Home() {
                         {uploadedFile.name}
                       </p>
                       <p className="text-sm text-green-600 dark:text-green-400">
-                        {formatFileSize(uploadedFile.size)}
+                        {formatFileSize(uploadedFile.size)} • Share code: {port}
                       </p>
                     </div>
                   </div>
@@ -274,7 +276,7 @@ export default function Home() {
                 </div>
               )}
               
-              {/* InviteCode intentionally hidden to avoid showing the code on the sender UI */}
+              <InviteCode port={port} />
             </div>
           ) : (
             <div className="space-y-6">
