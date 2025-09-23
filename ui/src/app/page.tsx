@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import FileUpload from '@/components/FileUpload';
 import FileDownload from '@/components/FileDownload';
+import InviteCode from '@/components/InviteCode';
 import ProgressBar from '@/components/ProgressBar';
 import axios from 'axios';
 
@@ -274,7 +275,7 @@ export default function Home() {
                 </div>
               )}
               
-              {/* InviteCode intentionally hidden as per requirement */}
+              <InviteCode port={port} />
             </div>
           ) : (
             <div className="space-y-6">
