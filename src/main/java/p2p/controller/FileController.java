@@ -4,9 +4,9 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -277,9 +277,10 @@ public class FileController {
                     return;
                 }
 
-                // Generate port for this file share
+                // Generate port (share code) for this file share
+                // We intentionally avoid spawning an ephemeral socket server.
+                // All downloads are served directly from disk for multi-receiver reliability.
                 int port = fileSharer.offerFile(savedFilePath);
-                new Thread(() -> fileSharer.startFileServer(port)).start();
 
                 String jsonResponse = "{\"port\": " + port + "}";
                 headers.add("Content-Type", "application/json");
@@ -322,103 +323,55 @@ public class FileController {
             
             try {
                 int port = Integer.parseInt(portStr);
-                
-                // Simple download - no password or limits
 
-                // Wait for the ephemeral peer port to be ready (avoid race with server startup)
-                Socket socket = null;
-                IOException lastErr = null;
-                for (int i = 0; i < 50; i++) { // up to ~10s (50 * 200ms)
-                    try {
-                        socket = new Socket("localhost", port);
-                        socket.setSoTimeout(60_000); // 60s socket read timeout
-                        break;
-                    } catch (IOException ce) {
-                        lastErr = ce;
-                        try { Thread.sleep(200); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+                // Direct-from-disk streaming for multi-receiver reliability
+                String directFilePath = fileSharer.getFilePath(port);
+                if (directFilePath != null) {
+                    File file = new File(directFilePath);
+                    if (!file.exists() || !file.isFile()) {
+                        String response = "Not Found: Shared file is missing";
+                        exchange.sendResponseHeaders(404, response.getBytes().length);
+                        try (OutputStream os = exchange.getResponseBody()) { os.write(response.getBytes()); }
+                        return;
                     }
-                }
-                if (socket == null) {
-                    throw new IOException("Could not connect to peer port " + port + (lastErr != null ? (": " + lastErr.getMessage()) : ""));
-                }
 
-                try (Socket finalSocket = socket;
-                     InputStream socketInput = new java.io.BufferedInputStream(finalSocket.getInputStream())) {
-                    String filename = "downloaded-file"; // Default filename
-                    long contentLength = -1L;
-
-                    // Read headers line by line
-                    StringBuilder headerBuilder = new StringBuilder();
-                    int b;
-                    while ((b = socketInput.read()) != -1) {
-                        if (b == '\n') {
-                            String line = headerBuilder.toString().trim();
-                            if (line.isEmpty()) {
-                                break; // End of headers
-                            }
-                            
-                            if (line.startsWith("Filename: ")) {
-                                filename = line.substring("Filename: ".length());
-                            } else if (line.startsWith("Length: ")) {
-                                try {
-                                    contentLength = Long.parseLong(line.substring("Length: ".length()).trim());
-                                } catch (NumberFormatException e) {
-                                    System.err.println("Failed to parse length: " + line);
-                                }
-                            }
-                            headerBuilder.setLength(0);
-                        } else {
-                            headerBuilder.append((char) b);
-                        }
-                    }
-                    
-                    System.out.println("Download headers - Filename: " + filename + ", Length: " + contentLength);
+                    String filename = file.getName();
+                    long contentLength = file.length();
 
                     headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
                     String mime = null;
-                    try {
-                        mime = java.net.URLConnection.guessContentTypeFromName(filename);
-                    } catch (Exception ignore) {}
-                    if (mime == null || mime.trim().isEmpty()) {
-                        mime = "application/octet-stream";
-                    }
+                    try { mime = java.net.URLConnection.guessContentTypeFromName(filename); } catch (Exception ignore) {}
+                    if (mime == null || mime.trim().isEmpty()) mime = "application/octet-stream";
                     headers.add("Content-Type", mime);
                     headers.add("Access-Control-Expose-Headers", "Content-Disposition");
-                    
-                    // Add security headers to make downloads appear safer
                     headers.add("X-Content-Type-Options", "nosniff");
                     headers.add("X-Download-Options", "noopen");
                     headers.add("Content-Security-Policy", "default-src 'none'");
-                    
-                    // Add cache headers to indicate this is a legitimate download
                     headers.add("Cache-Control", "private, no-cache, no-store, must-revalidate");
                     headers.add("Pragma", "no-cache");
                     headers.add("Expires", "0");
 
-                    // Use known length when available; else chunked
                     if (contentLength >= 0) {
                         exchange.sendResponseHeaders(200, contentLength);
                     } else {
                         exchange.sendResponseHeaders(200, -1);
                     }
-                    try (OutputStream os = exchange.getResponseBody()) {
+                    try (FileInputStream fis = new FileInputStream(file);
+                         OutputStream os = exchange.getResponseBody()) {
                         byte[] buffer = new byte[1024 * 1024];
                         int bytesRead;
-                        while ((bytesRead = socketInput.read(buffer)) != -1) {
+                        while ((bytesRead = fis.read(buffer)) != -1) {
                             os.write(buffer, 0, bytesRead);
                         }
                     }
-                    
-                } catch (IOException e) {
-                    System.err.println("Error downloading file from peer: " + e.getMessage());
-                    String response = "Error downloading file: " + e.getMessage();
-                    headers.add("Content-Type", "text/plain");
-                    exchange.sendResponseHeaders(500, response.getBytes().length);
-                    try (OutputStream os = exchange.getResponseBody()) {
-                        os.write(response.getBytes());
-                    }
+                    return;
                 }
-                
+
+                // Code not registered
+                String response = "Not Found: Invalid or expired code";
+                exchange.sendResponseHeaders(404, response.getBytes().length);
+                try (OutputStream os = exchange.getResponseBody()) { os.write(response.getBytes()); }
+
             } catch (NumberFormatException e) {
                 String response = "Bad Request: Invalid port number";
                 exchange.sendResponseHeaders(400, response.getBytes().length);
