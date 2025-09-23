@@ -4,7 +4,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -323,56 +322,16 @@ public class FileController {
             
             try {
                 int port = Integer.parseInt(portStr);
+                
+                // Simple download - no password or limits
 
-                // First, if the file is still present on disk (known by FileSharer), stream directly.
-                String directFilePath = fileSharer.getFilePath(port);
-                if (directFilePath != null) {
-                    File file = new File(directFilePath);
-                    if (!file.exists() || !file.isFile()) {
-                        throw new IOException("Shared file no longer exists on disk");
-                    }
-
-                    String filename = file.getName();
-                    long contentLength = file.length();
-
-                    headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-                    String mime = null;
-                    try { mime = java.net.URLConnection.guessContentTypeFromName(filename); } catch (Exception ignore) {}
-                    if (mime == null || mime.trim().isEmpty()) mime = "application/octet-stream";
-                    headers.add("Content-Type", mime);
-                    headers.add("Access-Control-Expose-Headers", "Content-Disposition");
-                    headers.add("X-Content-Type-Options", "nosniff");
-                    headers.add("X-Download-Options", "noopen");
-                    headers.add("Content-Security-Policy", "default-src 'none'");
-                    headers.add("Cache-Control", "private, no-cache, no-store, must-revalidate");
-                    headers.add("Pragma", "no-cache");
-                    headers.add("Expires", "0");
-
-                    if (contentLength >= 0) {
-                        exchange.sendResponseHeaders(200, contentLength);
-                    } else {
-                        exchange.sendResponseHeaders(200, -1);
-                    }
-                    try (FileInputStream fis = new FileInputStream(file);
-                         OutputStream os = exchange.getResponseBody()) {
-                        byte[] buffer = new byte[1024 * 1024];
-                        int bytesRead;
-                        while ((bytesRead = fis.read(buffer)) != -1) {
-                            os.write(buffer, 0, bytesRead);
-                        }
-                    }
-                    return; // done
-                }
-
-                // Otherwise, fall back to the ephemeral peer socket bridge
                 // Wait for the ephemeral peer port to be ready (avoid race with server startup)
                 Socket socket = null;
                 IOException lastErr = null;
-                final int maxAttempts = 300; // ~60s (300 * 200ms)
-                for (int i = 0; i < maxAttempts; i++) {
+                for (int i = 0; i < 50; i++) { // up to ~10s (50 * 200ms)
                     try {
-                        socket = new Socket("127.0.0.1", port);
-                        socket.setSoTimeout(120_000); // 120s socket read timeout (large files / slow connections)
+                        socket = new Socket("localhost", port);
+                        socket.setSoTimeout(60_000); // 60s socket read timeout
                         break;
                     } catch (IOException ce) {
                         lastErr = ce;
@@ -380,9 +339,7 @@ public class FileController {
                     }
                 }
                 if (socket == null) {
-                    throw new IOException("Could not connect to peer port " + port +
-                            (lastErr != null ? (": " + lastErr.getClass().getSimpleName() + ": " + lastErr.getMessage()) : "") +
-                            "; attempts=" + maxAttempts);
+                    throw new IOException("Could not connect to peer port " + port + (lastErr != null ? (": " + lastErr.getMessage()) : ""));
                 }
 
                 try (Socket finalSocket = socket;
@@ -453,7 +410,7 @@ public class FileController {
                     }
                     
                 } catch (IOException e) {
-                    System.err.println("Error downloading file from peer (port=" + port + "): " + e.getClass().getSimpleName() + ": " + e.getMessage());
+                    System.err.println("Error downloading file from peer: " + e.getMessage());
                     String response = "Error downloading file: " + e.getMessage();
                     headers.add("Content-Type", "text/plain");
                     exchange.sendResponseHeaders(500, response.getBytes().length);

@@ -75,7 +75,8 @@ export default function Home() {
       setUploadSpeed(0);
       setUploadEta(0);
       
-      // File uploaded successfully - no popup needed
+      // Show success message
+      alert(`File uploaded successfully!\n\nShare this code with recipients: ${response.data.port}`);
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file. Please try again.');
@@ -255,7 +256,7 @@ export default function Home() {
                         {uploadedFile.name}
                       </p>
                       <p className="text-sm text-green-600 dark:text-green-400">
-                        {formatFileSize(uploadedFile.size)}
+                        {formatFileSize(uploadedFile.size)} • Share code: {port}
                       </p>
                     </div>
                   </div>
