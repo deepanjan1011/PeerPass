@@ -18,6 +18,14 @@ public class FileSharer {
         availableFiles = new HashMap<>();
     }
 
+    /**
+     * Returns the absolute file path associated with a given share code (port),
+     * or null if not present.
+     */
+    public String getFilePath(int port) {
+        return availableFiles.get(port);
+    }
+
     public int offerFile(String filePath) {
         int port;
         while (true) {
