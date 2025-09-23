@@ -9,8 +9,6 @@ import java.net.Socket;
 import java.util.HashMap;
 
 import p2p.utils.UploadUtils;
-import p2p.service.FileShareManager;
-import p2p.model.FileShare;
 
 public class FileSharer {
 
@@ -39,15 +37,11 @@ public class FileSharer {
     }
 
     public void startFileServer(int port) {
-        // Get file share from FileShareManager
-        FileShareManager fileShareManager = FileShareManager.getInstance();
-        FileShare fileShare = fileShareManager.getFileShareByPort(port);
-        if (fileShare == null) {
-            System.err.println("No file share associated with port: " + port);
+        String filePath = availableFiles.get(port);
+        if (filePath == null) {
+            System.err.println("No file associated with port: " + port);
             return;
         }
-        
-        String filePath = fileShare.getFilePath();
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Serving file '" + new File(filePath).getName() + "' on port " + port);
