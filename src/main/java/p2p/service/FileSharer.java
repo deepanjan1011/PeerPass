@@ -43,15 +43,37 @@ public class FileSharer {
             return;
         }
 
+        // Allow multiple receivers to download using the same code.
+        // We keep the server socket open and accept clients in a loop.
+        // To avoid dangling servers, we enforce a max runtime and optional client limit.
+        final int maxClients = 50;          // reasonable upper bound
+        final long maxRunMillis = 15 * 60_000L; // 15 minutes
+        long start = System.currentTimeMillis();
+        int served = 0;
+
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Serving file '" + new File(filePath).getName() + "' on port " + port);
-            Socket clientSocket = serverSocket.accept();
-            System.out.println("Client connected: " + clientSocket.getInetAddress());
+            serverSocket.setReuseAddress(true);
+            serverSocket.setSoTimeout(2_000); // so we can periodically check timeouts
 
-            new Thread(new FileSenderHandler(clientSocket, filePath)).start();
+            System.out.println("Serving file '" + new File(filePath).getName() + "' on port " + port +
+                               " (multi-client, up to " + maxClients + " clients or " + (maxRunMillis / 60000) + " min)");
 
+            while (served < maxClients && (System.currentTimeMillis() - start) < maxRunMillis) {
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    System.out.println("Client connected: " + clientSocket.getInetAddress());
+                    served++;
+                    new Thread(new FileSenderHandler(clientSocket, filePath)).start();
+                } catch (IOException acceptErr) {
+                    // Likely a timeout; loop and re-check limits
+                }
+            }
         } catch (IOException e) {
             System.err.println("Error starting file server on port " + port + ": " + e.getMessage());
+        } finally {
+            // Remove mapping so the code can be reused in the future
+            availableFiles.remove(port);
+            System.out.println("File server on port " + port + " stopped after serving " + served + " client(s).");
         }
     }
 
