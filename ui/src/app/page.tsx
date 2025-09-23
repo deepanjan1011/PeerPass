@@ -70,6 +70,11 @@ export default function Home() {
       
       setPort(response.data.port);
       
+      // Reset progress states after successful upload
+      setUploadProgress(100);
+      setUploadSpeed(0);
+      setUploadEta(0);
+      
       // Show success message
       alert(`File uploaded successfully!\n\nShare this code with recipients: ${response.data.port}`);
     } catch (error) {
@@ -240,18 +245,18 @@ export default function Home() {
             <div className="space-y-6">
               <FileUpload onFileUpload={handleFileUpload} isUploading={isUploading} />
               
-              {uploadedFile && !isUploading && (
-                <div className="p-4 bg-muted/50 rounded-lg border border-border">
+              {uploadedFile && !isUploading && port && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="flex items-center space-x-3">
-                    <svg className="w-5 h-5 text-primary flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground truncate">
+                      <p className="font-medium text-green-800 dark:text-green-200 truncate">
                         {uploadedFile.name}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatFileSize(uploadedFile.size)}
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        {formatFileSize(uploadedFile.size)} • Share code: {port}
                       </p>
                     </div>
                   </div>
