@@ -12,9 +12,7 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [port, setPort] = useState<number | null>(null);
-  const [fileId, setFileId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
-  const [downloadPassword, setDownloadPassword] = useState('');
   
   // Progress tracking states
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -31,7 +29,7 @@ export default function Home() {
   const lastUploadBytes = useRef<number>(0);
   const lastDownloadBytes = useRef<number>(0);
 
-  const handleFileUpload = async (file: File, password?: string) => {
+  const handleFileUpload = async (file: File) => {
     setUploadedFile(file);
     setIsUploading(true);
     setUploadProgress(0);
@@ -43,9 +41,7 @@ export default function Home() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      if (password) {
-        formData.append('password', password);
-      }
+      // No password needed
       
       const response = await axios.post('/api/upload', formData, {
         headers: {
@@ -73,14 +69,9 @@ export default function Home() {
       });
       
       setPort(response.data.port);
-      setFileId(response.data.fileId);
       
-      // Show success message with file ID
-      if (response.data.hasPassword) {
-        alert(`File uploaded successfully! File ID: ${response.data.fileId}\n\nThis file is password protected. Share the code and password with recipients.`);
-      } else {
-        alert(`File uploaded successfully! File ID: ${response.data.fileId}\n\nShare this code with recipients to download the file.`);
-      }
+      // Show success message
+      alert(`File uploaded successfully!\n\nShare this code with recipients: ${response.data.port}`);
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file. Please try again.');
@@ -89,7 +80,7 @@ export default function Home() {
     }
   };
   
-  const handleDownload = async (port: number, password?: string) => {
+  const handleDownload = async (port: number) => {
     setIsDownloading(true);
     setDownloadProgress(0);
     setDownloadSpeed(0);
@@ -99,9 +90,7 @@ export default function Home() {
 
     try {
       // Simple download - get the full file at once
-      const url = password 
-        ? `/api/download/${port}?password=${encodeURIComponent(password)}`
-        : `/api/download/${port}`;
+      const url = `/api/download/${port}`;
         
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
@@ -133,9 +122,9 @@ export default function Home() {
 
       // Create and download the file
       const blob = new Blob([response.data]);
-      const url = window.URL.createObjectURL(blob);
+      const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = url;
+      link.href = blobUrl;
       link.setAttribute('download', filename);
       
       // Add attributes to make the download appear safer
@@ -145,7 +134,7 @@ export default function Home() {
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(blobUrl);
       
       // Show success message
       console.log('File downloaded successfully:', filename);
