@@ -1,0 +1,2 @@
+web: java -jar target/p2p-1.0-SNAPSHOT.jar
+
