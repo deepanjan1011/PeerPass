@@ -7,14 +7,15 @@ import InviteCode from '@/components/InviteCode';
 import ProgressBar from '@/components/ProgressBar';
 import axios from 'axios';
 
+const API = process.env.NEXT_PUBLIC_API_URL; // ✅ Added
+
 export default function Home() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [port, setPort] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'upload' | 'download'>('upload');
-  
-  // Progress tracking states
+
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadSpeed, setUploadSpeed] = useState(0);
   const [uploadEta, setUploadEta] = useState(0);
@@ -22,8 +23,7 @@ export default function Home() {
   const [downloadSpeed, setDownloadSpeed] = useState(0);
   const [downloadEta, setDownloadEta] = useState(0);
   const [downloadedBytes, setDownloadedBytes] = useState(0);
-  
-  // Refs for tracking progress
+
   const uploadStartTime = useRef<number>(0);
   const downloadStartTime = useRef<number>(0);
   const lastUploadBytes = useRef<number>(0);
@@ -37,13 +37,13 @@ export default function Home() {
     setUploadEta(0);
     uploadStartTime.current = Date.now();
     lastUploadBytes.current = 0;
-    
+
     try {
       const formData = new FormData();
       formData.append('file', file);
-      // No password needed
-      
-      const response = await axios.post('/api/upload', formData, {
+
+      // ✅ FIX: Use Railway backend
+      const response = await axios.post(`${API}/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -51,14 +51,13 @@ export default function Home() {
           if (progressEvent.total) {
             const progress = (progressEvent.loaded / progressEvent.total) * 100;
             setUploadProgress(progress);
-            
-            // Calculate speed and ETA
+
             const currentTime = Date.now();
-            const elapsedTime = (currentTime - uploadStartTime.current) / 1000; // seconds
+            const elapsedTime = (currentTime - uploadStartTime.current) / 1000;
             const bytesPerSecond = progressEvent.loaded / elapsedTime;
             const mbps = bytesPerSecond / (1024 * 1024);
             setUploadSpeed(mbps);
-            
+
             if (mbps > 0) {
               const remainingBytes = progressEvent.total - progressEvent.loaded;
               const eta = remainingBytes / bytesPerSecond;
@@ -67,15 +66,13 @@ export default function Home() {
           }
         },
       });
-      
+
       setPort(response.data.port);
-      
-      // Reset progress states after successful upload
+
       setUploadProgress(100);
       setUploadSpeed(0);
       setUploadEta(0);
-      
-      // Success handled silently; no popup and no code display
+
     } catch (error) {
       console.error('Error uploading file:', error);
       alert('Failed to upload file. Please try again.');
@@ -83,7 +80,7 @@ export default function Home() {
       setIsUploading(false);
     }
   };
-  
+
   const handleDownload = async (port: number) => {
     setIsDownloading(true);
     setDownloadProgress(0);
@@ -93,9 +90,9 @@ export default function Home() {
     downloadStartTime.current = Date.now();
 
     try {
-      // Simple download - get the full file at once
-      const url = `/api/download/${port}`;
-        
+      // ✅ FIX: Use Railway backend
+      const url = `${API}/download/${port}`;
+
       const response = await axios.get(url, {
         responseType: 'arraybuffer',
         onDownloadProgress: (progressEvent) => {
@@ -105,16 +102,15 @@ export default function Home() {
             const progress = (downloaded / total) * 100;
             const elapsed = (Date.now() - downloadStartTime.current) / 1000;
             const speed = downloaded / elapsed;
-            
+
             setDownloadedBytes(downloaded);
             setDownloadProgress(progress);
-            setDownloadSpeed(speed / (1024 * 1024)); // MB/s
+            setDownloadSpeed(speed / (1024 * 1024));
             setDownloadEta((total - downloaded) / speed);
           }
         }
       });
 
-      // Get filename from Content-Disposition header
       let filename = 'downloaded-file';
       const contentDisposition = response.headers['content-disposition'];
       if (contentDisposition) {
@@ -124,25 +120,21 @@ export default function Home() {
         }
       }
 
-      // Create and download the file
       const blob = new Blob([response.data]);
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = blobUrl;
       link.setAttribute('download', filename);
-      
-      // Add attributes to make the download appear safer
       link.setAttribute('type', 'application/octet-stream');
       link.setAttribute('rel', 'noopener noreferrer');
-      
+
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(blobUrl);
-      
-      // Show success message
+
       console.log('File downloaded successfully:', filename);
-      
+
     } catch (error) {
       console.error('Download failed:', error);
       alert('Download failed: ' + (error as Error).message);
@@ -159,6 +151,7 @@ export default function Home() {
   };
 
   return (
+    /* ⭐ EVERYTHING BELOW IS UNCHANGED — your UI stays exactly the same ⭐ */
     <div className="min-h-screen flex flex-col">
       {/* Navigation Bar */}
       <nav className="border-b border-border/40 backdrop-blur-md bg-background/95 sticky top-0 z-50">
@@ -174,11 +167,7 @@ export default function Home() {
                     strokeWidth="2.5"
                     viewBox="0 0 24 24"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                    />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
                 </div>
                 <div className="absolute -inset-1 bg-gradient-to-br from-primary/20 to-primary/10 rounded-xl blur-sm -z-10 logo-glow"></div>
@@ -208,9 +197,8 @@ export default function Home() {
             Transfer files securely through peer-to-peer connections. No cloud storage, no intermediaries.
           </p>
         </div>
-        
+
         <div className="card glass p-8 max-w-3xl mx-auto">
-          {/* Tab Navigation */}
           <div className="flex border-b border-border mb-8">
             <button
               className={`tab-button ${
@@ -239,11 +227,11 @@ export default function Home() {
               </div>
             </button>
           </div>
-          
+
           {activeTab === 'upload' ? (
             <div className="space-y-6">
               <FileUpload onFileUpload={handleFileUpload} isUploading={isUploading} />
-              
+
               {uploadedFile && !isUploading && port && (
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="flex items-center space-x-3">
@@ -261,7 +249,7 @@ export default function Home() {
                   </div>
                 </div>
               )}
-              
+
               {isUploading && uploadedFile && (
                 <div className="p-6 bg-muted/50 rounded-lg border border-border">
                   <ProgressBar
@@ -274,13 +262,13 @@ export default function Home() {
                   />
                 </div>
               )}
-              
+
               <InviteCode port={port} />
             </div>
           ) : (
             <div className="space-y-6">
               <FileDownload onDownload={handleDownload} isDownloading={isDownloading} />
-              
+
               {isDownloading && (
                 <div className="p-6 bg-muted/50 rounded-lg border border-border">
                   <ProgressBar
@@ -297,7 +285,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Features Section */}
         <div className="mt-16 grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <div className="text-center p-6">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
@@ -308,7 +295,7 @@ export default function Home() {
             <h3 className="font-semibold mb-2">Real-time Progress</h3>
             <p className="text-sm text-muted-foreground">Track upload/download progress with speed and ETA indicators</p>
           </div>
-          
+
           <div className="text-center p-6">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -318,7 +305,7 @@ export default function Home() {
             <h3 className="font-semibold mb-2">Direct Transfer</h3>
             <p className="text-sm text-muted-foreground">P2P connection ensures fast, direct file sharing</p>
           </div>
-          
+
           <div className="text-center p-6">
             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
               <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -330,8 +317,7 @@ export default function Home() {
           </div>
         </div>
       </div>
-      
-      {/* Footer */}
+
       <footer className="border-t border-border/40 mt-auto">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col sm:flex-row items-center justify-between text-sm text-muted-foreground">
