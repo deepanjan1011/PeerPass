@@ -1,10 +1,10 @@
 package p2p.controller;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.UUID;
@@ -207,7 +207,16 @@ public class FileController {
         public void handle(HttpExchange exchange) throws IOException {
             Headers headers = exchange.getResponseHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
-            
+            headers.add("Access-Control-Allow-Methods", "POST, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    
+            // Handle CORS preflight
+            if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+    
+            // Only allow POST after preflight
             if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {
                 String response = "Method Not Allowed";
                 exchange.sendResponseHeaders(405, response.getBytes().length);
@@ -216,10 +225,10 @@ public class FileController {
                 }
                 return;
             }
-            
+    
             Headers requestHeaders = exchange.getRequestHeaders();
             String contentType = requestHeaders.getFirst("Content-Type");
-            
+    
             if (contentType == null || !contentType.startsWith("multipart/form-data")) {
                 String response = "Bad Request: Content-Type must be multipart/form-data";
                 exchange.sendResponseHeaders(400, response.getBytes().length);
@@ -228,36 +237,36 @@ public class FileController {
                 }
                 return;
             }
-            
+    
             try {
                 DiskFileItemFactory factory = new DiskFileItemFactory();
                 factory.setSizeThreshold(0);
                 factory.setRepository(new File(uploadDir));
-
+    
                 FileUpload upload = new FileUpload(factory);
                 upload.setFileSizeMax(-1);
                 upload.setSizeMax(-1);
-
+    
                 HttpExchangeRequestContext ctx = new HttpExchangeRequestContext(exchange);
                 FileItemIterator iter = upload.getItemIterator(ctx);
-
+    
                 String savedFilePath = null;
                 String filename = null;
-                
+    
                 while (iter.hasNext()) {
                     FileItemStream item = iter.next();
-                    if (item.isFormField()) {
-                        continue; // Skip form fields
-                    }
-                    
+                    if (item.isFormField()) continue;
+    
                     filename = item.getName();
                     if (filename == null || filename.trim().isEmpty()) {
                         filename = "unnamed-file";
                     }
                     String uniqueFilename = UUID.randomUUID().toString() + "_" + new File(filename).getName();
                     String filePath = uploadDir + File.separator + uniqueFilename;
-
-                    try (InputStream in = item.openStream(); OutputStream out = new FileOutputStream(filePath)) {
+    
+                    try (InputStream in = item.openStream();
+                         OutputStream out = new FileOutputStream(filePath)) {
+    
                         byte[] buffer = new byte[1024 * 1024];
                         int read;
                         while ((read = in.read(buffer)) != -1) {
@@ -267,7 +276,7 @@ public class FileController {
                     savedFilePath = filePath;
                     break;
                 }
-
+    
                 if (savedFilePath == null) {
                     String response = "Bad Request: No file part found";
                     exchange.sendResponseHeaders(400, response.getBytes().length);
@@ -276,19 +285,16 @@ public class FileController {
                     }
                     return;
                 }
-
-                // Generate port (share code) for this file share
-                // We intentionally avoid spawning an ephemeral socket server.
-                // All downloads are served directly from disk for multi-receiver reliability.
+    
                 int port = fileSharer.offerFile(savedFilePath);
-
+    
                 String jsonResponse = "{\"port\": " + port + "}";
                 headers.add("Content-Type", "application/json");
                 exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
                 try (OutputStream os = exchange.getResponseBody()) {
                     os.write(jsonResponse.getBytes());
                 }
-                
+    
             } catch (Exception e) {
                 System.err.println("Error processing file upload: " + e.getMessage());
                 String response = "Server error: " + e.getMessage();
@@ -300,11 +306,20 @@ public class FileController {
         }
     }
     
+    
     private class DownloadHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             Headers headers = exchange.getResponseHeaders();
             headers.add("Access-Control-Allow-Origin", "*");
+            headers.add("Access-Control-Allow-Methods", "GET, OPTIONS");
+            headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+            // Handle preflight
+            if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
             
             if (!exchange.getRequestMethod().equalsIgnoreCase("GET")) {
                 String response = "Method Not Allowed";
