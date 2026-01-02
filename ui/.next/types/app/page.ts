@@ -1,4 +1,4 @@
-// File: /Users/deepanjanpati/Developer/PeerPass/ui/src/app/page.tsx
+// File: /Users/deepanjanpati/Developer/Projects and Portfolios/Java projects/PeerPass/ui/src/app/page.tsx
 import * as entry from '../../../src/app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

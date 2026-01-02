@@ -18,6 +18,8 @@ export const metadata: Metadata = {
   },
 }
 
+import Footer from '@/components/Footer'
+
 export default function RootLayout({
   children,
 }: {
@@ -26,8 +28,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <main className="min-h-screen gradient-bg">
-          {children}
+        <main className="min-h-screen gradient-bg flex flex-col">
+          <div className="flex-1">
+            {children}
+          </div>
+          <Footer />
         </main>
       </body>
     </html>

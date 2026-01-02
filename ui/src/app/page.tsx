@@ -201,9 +201,8 @@ export default function Home() {
         <div className="card glass p-8 max-w-3xl mx-auto">
           <div className="flex border-b border-border mb-8">
             <button
-              className={`tab-button ${
-                activeTab === 'upload' ? 'tab-button-active' : 'tab-button-inactive'
-              }`}
+              className={`tab-button ${activeTab === 'upload' ? 'tab-button-active' : 'tab-button-inactive'
+                }`}
               onClick={() => setActiveTab('upload')}
             >
               <div className="flex items-center space-x-2">
@@ -214,9 +213,8 @@ export default function Home() {
               </div>
             </button>
             <button
-              className={`tab-button ${
-                activeTab === 'download' ? 'tab-button-active' : 'tab-button-inactive'
-              }`}
+              className={`tab-button ${activeTab === 'download' ? 'tab-button-active' : 'tab-button-inactive'
+                }`}
               onClick={() => setActiveTab('download')}
             >
               <div className="flex items-center space-x-2">
@@ -318,18 +316,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="border-t border-border/40 mt-auto">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between text-sm text-muted-foreground">
-            <p>© {new Date().getFullYear()} PeerPass. File Sharing Platform.</p>
-            <div className="flex items-center space-x-4 mt-2 sm:mt-0">
-              <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-              <a href="#" className="hover:text-foreground transition-colors">Support</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+
     </div>
   );
 }
