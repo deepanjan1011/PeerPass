@@ -20,6 +20,6 @@ ui/yarn-error.log*
 ui/pnpm-lock.yaml
 # Docker
 **/.dockerignore
-Dockerfile*
+
 # OS
 Thumbs.db
