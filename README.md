@@ -14,6 +14,10 @@
 
 PeerPass moves away from traditional database storage for file transfers, utilizing direct socket streams and dedicated threads instead.
 
+<p align="center">
+  <img src="./public/architecture.png" alt="PeerPass Architecture Diagram" />
+</p>
+
 1. **Upload:** A user uploads a file via the frontend.
 2. **Dynamic Port Assignment:** The Java server receives the stream via `multipart/form-data` and assigns a unique, dynamic download port.
 3. **Thread Spawning:** The server spawns a dedicated thread responsible solely for serving that specific file.
