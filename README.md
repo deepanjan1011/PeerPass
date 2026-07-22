@@ -99,28 +99,28 @@ Streams the file content directly from the dedicated thread.
 Follow these steps to run PeerPass on your local machine.
 
 ### Prerequisites
-* **Java:** JDK 8 or higher installed (`java -version`)
+* **Java:** JDK 17 or higher installed (`java -version`)
+* **Maven:** Installed (`mvn -version`)
 * **Node.js:** Installed with npm (`node -v`)
 
 ### 1. Run the Backend
-Navigate to the server directory, compile the Java source files, and start the application.
+Build the JAR with Maven and start the web server (main class `p2p.App`).
 
 ```bash
-cd server
-# Compile all Java files
-javac Main.java
+# Build (compiles and packages into target/)
+mvn clean package
 
-# Run the Main class
-java Main
+# Start the web/API server on port 8080
+java -jar target/p2p-1.0-SNAPSHOT.jar
 ```
 
-The server should now be running (default usually on port 8080 or similar, check console output).
+The server runs on port 8080. Press Enter in the console to stop it.
 
 ### 2. Run the Frontend
-Open a new terminal, navigate to the client directory, install dependencies, and start the Next.js dev server.
+Open a new terminal, navigate to the `ui` directory, install dependencies, and start the Next.js dev server.
 
 ```bash
-cd client
+cd ui
 # Install dependencies
 npm install
 
@@ -132,6 +132,39 @@ npm run dev
 1. Open your browser and go to `http://localhost:3000`.
 2. Upload a file via the UI.
 3. Use the generated link/port to download the file in a separate tab or browser.
+
+> **Note:** The web UI transfers files through the backend server (a relay). For a
+> genuine peer-to-peer transfer where bytes flow directly between two machines, use
+> the CLI below.
+
+---
+
+## 🤝 Peer-to-Peer CLI (Direct Transfer)
+
+The same JAR can run as a **sender** or **receiver** peer. In this mode the file
+bytes stream **directly socket-to-socket** between the two peers — no server in the
+data path. Each sender dynamically allocates an ephemeral port (49152–65535) and
+serves connecting peers on their own thread, exchanging a small text handshake
+(`PEERPASS/1.0 HELLO` → `OK` + `Filename`/`Length`) before streaming in 1 MB chunks.
+
+**Sender** — offer a file and wait for peers:
+```bash
+java -jar target/p2p-1.0-SNAPSHOT.jar send ./myfile.pdf
+# → Serving 'myfile.pdf' on port 53279
+#   Peers can fetch it with:  receive 192.168.1.5:53279
+```
+
+**Receiver** — connect directly and download:
+```bash
+java -jar target/p2p-1.0-SNAPSHOT.jar receive 192.168.1.5:53279 ./downloads
+```
+
+The receiver verifies the byte count against the advertised `Length` and fails on a
+short read.
+
+**Reachability:** Direct connections work out of the box on the **same LAN**. Across
+the internet the receiver must be able to reach the sender's `host:port`
+(port-forwarding). Automatic NAT traversal (STUN/TURN) is not implemented.
 
 ---
 
